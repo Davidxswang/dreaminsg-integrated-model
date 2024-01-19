@@ -144,7 +144,7 @@ def plot_bokeh_from_integrated_graph(
 
     p = figure(
         background_fill_color="white",
-        plot_width=800,
+        width=800,
         height=500,
         title=title,
         x_range=(extent[0][0], extent[1][0]),
@@ -822,7 +822,7 @@ def plot_disruptions_and_crews(integrated_network, basemap=False):
     extent = integrated_network.map_extends
     p = figure(
         background_fill_color="white",
-        plot_width=800,
+        width=800,
         height=450,
         # x_range=(extent[0][0] - 100, extent[1][0] + 100),
         # y_range=(extent[0][1] - 100, extent[1][1] + 100),

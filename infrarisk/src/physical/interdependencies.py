@@ -91,6 +91,10 @@ class DependencyTable:
         """
         self.add_transpo_access(integrated_graph)
 
+    def __pandas_append(self, source, new_thing: dict):
+        assert isinstance(new_thing, dict)
+        return pd.concat([source, pd.DataFrame([new_thing])], ignore_index=True)
+
     def add_pump_motor_coupling(self, water_id, power_id):
         """Creates a pump-on-motor dependency entry in the dependency table.
 
@@ -99,14 +103,14 @@ class DependencyTable:
         :param power_id: The name of the motor in the power systems model.
         :type power_id: string
         """
-        self.wp_table = self.wp_table.append(
+        self.wp_table = self.__pandas_append(
+            self.wp_table,
             {
                 "water_id": water_id,
                 "power_id": power_id,
                 "water_type": "Pump",
                 "power_type": "Motor",
-            },
-            ignore_index=True,
+            }
         )
 
     def add_pump_loadmotor_coupling(self, water_id, power_id):
@@ -117,14 +121,14 @@ class DependencyTable:
         :param power_id: The name of the motor (modeled as load in three phase pandapower networks) in the power systems model.
         :type power_id: string
         """
-        self.wp_table = self.wp_table.append(
+        self.wp_table = self.__pandas_append(
+            self.wp_table,
             {
                 "water_id": water_id,
                 "power_id": power_id,
                 "water_type": "Pump",
                 "power_type": "Motor as Load",
-            },
-            ignore_index=True,
+            }
         )
 
     def add_gen_reserv_coupling(self, water_id, power_id):
@@ -135,14 +139,14 @@ class DependencyTable:
         :param power_id: The name of the generator in the power systems model.
         :type power_id: string
         """
-        self.wp_table = self.wp_table.append(
+        self.wp_table = self.__pandas_append(
+            self.wp_table,
             {
                 "water_id": water_id,
                 "power_id": power_id,
                 "water_type": "Reservoir",
                 "power_type": "Generator",
-            },
-            ignore_index=True,
+            }
         )
 
     def add_transpo_access(self, integrated_graph):
@@ -163,7 +167,8 @@ class DependencyTable:
                 node,
                 "transpo",
             )
-            self.access_table = self.access_table.append(
+            self.access_table = self.__pandas_append(
+                self.access_table,
                 {
                     "origin_id": node,
                     "transp_id": near_node,
@@ -171,7 +176,6 @@ class DependencyTable:
                     "origin_type": comp_details["name"],
                     "access_dist": near_dist,
                 },
-                ignore_index=True,
             )
 
     def update_dependencies(self, network, time_stamp, next_time_stamp):

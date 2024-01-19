@@ -71,6 +71,10 @@ class NetworkRecovery:
                     list(self.network.get_disruptive_events().time_stamp)[0]
                 )
 
+    def append_event(self, event: dict):
+        assert isinstance(event, dict)
+        self.event_table = pd.concat([self.event_table, pd.DataFrame([event])], ignore_index=True)
+
     def add_disruption_to_event_table(self):
         """Schedules the events until the initial disruption events."""
         column_list = [
@@ -93,27 +97,25 @@ class NetworkRecovery:
 
         # Schedule component performance at the start of the simulation.
         for _, component in enumerate(self.network.get_disrupted_components()):
-            self.event_table = self.event_table.append(
+            self.append_event(
                 {
                     "time_stamp": 0,
                     "components": component,
                     "perf_level": 100,
                     "component_state": "Functional",
-                },
-                ignore_index=True,
+                }
             )
 
         # Schedule component disruptions
         for _, row in self.network.disruptive_events.iterrows():
             disrupt_time = get_nearest_time_step(row[0], 2 * self.sim_step)
-            self.event_table = self.event_table.append(
+            self.append_event(
                 {
                     "time_stamp": disrupt_time,
                     "components": row[1],
                     "perf_level": 100 - row[2],
                     "component_state": "Service Disrupted",
                 },
-                ignore_index=True,
             )
 
             compon_details = interdependencies.get_compon_details(component)
@@ -366,7 +368,7 @@ class NetworkRecovery:
                             <= pipe_isolation_time
                             <= recovery_start - 2 * self.sim_step
                         ):
-                            self.event_table = self.event_table.append(
+                            self.append_event(
                                 {
                                     "time_stamp": pipe_isolation_time,  # Leaks closed within 10 mins
                                     "components": component,
@@ -377,7 +379,6 @@ class NetworkRecovery:
                                     ].fail_perc.item(),
                                     "component_state": "Pipe Isolated",
                                 },
-                                ignore_index=True,
                             )
                     elif self._pipe_close_policy == "sensor_based_cluster_isolation":
                         cluster_isolation_time = get_nearest_time_step(
@@ -389,7 +390,7 @@ class NetworkRecovery:
                             <= pipe_isolation_time
                             <= recovery_start - 2 * self.sim_step
                         ):
-                            self.event_table = self.event_table.append(
+                            self.append_event(
                                 {
                                     "time_stamp": cluster_isolation_time,
                                     "components": component,
@@ -399,8 +400,7 @@ class NetworkRecovery:
                                         == component
                                     ].fail_perc.item(),
                                     "component_state": "Valves Isolated",
-                                },
-                                ignore_index=True,
+                                }
                             )
 
             elif compon_details["infra"] == "power":
@@ -415,7 +415,7 @@ class NetworkRecovery:
                             <= line_isolation_time
                             <= recovery_start - 2 * self.sim_step
                         ):
-                            self.event_table = self.event_table.append(
+                            self.append_event(
                                 {
                                     "time_stamp": line_isolation_time,
                                     "components": component,
@@ -425,8 +425,7 @@ class NetworkRecovery:
                                         == component
                                     ].fail_perc.item(),
                                     "component_state": "Line Isolated",
-                                },
-                                ignore_index=True,
+                                }
                             )
                     elif self._line_close_policy == "sensor_based_cluster_isolation":
                         cluster_isolation_time = get_nearest_time_step(
@@ -438,7 +437,7 @@ class NetworkRecovery:
                             <= cluster_isolation_time
                             <= recovery_start - 2 * self.sim_step
                         ):
-                            self.event_table = self.event_table.append(
+                            self.append_event(
                                 {
                                     "time_stamp": cluster_isolation_time,  # Leaks closed within 10 mins
                                     "components": component,
@@ -448,11 +447,10 @@ class NetworkRecovery:
                                         == component
                                     ].fail_perc.item(),
                                     "component_state": "Switches Isolated",
-                                },
-                                ignore_index=True,
+                                }
                             )
 
-            self.event_table = self.event_table.append(
+            self.append_event(
                 {
                     "time_stamp": recovery_start,
                     "components": component,
@@ -462,11 +460,11 @@ class NetworkRecovery:
                     ].fail_perc.item(),
                     "component_state": "Repairing",
                 },
-                ignore_index=True,
+
             )
 
             if recovery_end - self.sim_step * 2 > recovery_start:
-                self.event_table = self.event_table.append(
+                self.append_event(
                     {
                         "time_stamp": recovery_end - self.sim_step * 2,
                         "components": component,
@@ -475,39 +473,43 @@ class NetworkRecovery:
                             self.network.disruptive_events.components == component
                         ].fail_perc.item(),
                         "component_state": "Repairing",
-                    },
-                    ignore_index=True,
+                    }
                 )
 
-            self.event_table = self.event_table.append(
+            self.append_event(
                 {
                     "time_stamp": recovery_end,
                     "components": component,
                     "perf_level": 100,
                     "component_state": "Service Restored",
-                },
-                ignore_index=True,
+                }
             )
 
-            self.event_table = self.event_table.append(
+            self.append_event(
                 {
                     "time_stamp": recovery_end + self.sim_step * 2,
                     "components": component,
                     "perf_level": 100,
                     "component_state": "Service Restored",
-                },
-                ignore_index=True,
+                }
             )
 
             # -----------------------------------------------
-            self.event_table_wide = self.event_table_wide.append(
-                {
-                    "component": component,
-                    "disrupt_time": disruption_time,
-                    "repair_start": recovery_start,
-                    "functional_start": recovery_end,
-                },
-                ignore_index=True,
+            self.event_table_wide = pd.concat(
+                [
+                    self.event_table_wide,
+                    pd.DataFrame(
+                        [
+                            {
+                                "component": component,
+                                "disrupt_time": disruption_time,
+                                "repair_start": recovery_start,
+                                "functional_start": recovery_end,
+                            }
+                        ]
+                    )
+                ],
+
             )
             self.total_recovery_time[compon_details["infra"]] += (
                 recovery_end - recovery_start
@@ -523,14 +525,13 @@ class NetworkRecovery:
         """
         max_event_table_time = self.event_table["time_stamp"].max()
         for component in repair_order:
-            self.event_table = self.event_table.append(
+            self.append_event(
                 {
                     "time_stamp": max_event_table_time + extra_hours * 3600,
                     "components": component,
                     "perf_level": 100,
                     "component_state": "Service Restored",
-                },
-                ignore_index=True,
+                }
             )
 
     def schedule_recovery(self, repair_order):
@@ -1082,7 +1083,8 @@ def pump_outage_event(wn, pump_name, start_time, end_time):
     from wntr.network.controls import _InternalControlAction, Control
 
     pump = wn.get_link(pump_name)
-    # pump._power_outage = True
+    pump._power_outage = True
+    # this was commented, but if it is commented, the simulation cannot run.
 
     # # Outage
     # act = ControlAction(pump, "status", LinkStatus.Closed)
